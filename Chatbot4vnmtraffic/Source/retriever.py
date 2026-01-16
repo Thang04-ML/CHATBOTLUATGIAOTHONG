@@ -1,77 +1,10 @@
-# import json
-# import pickle
-# import numpy as np
-# import string
-# from rank_bm25 import BM25Okapi
-# from pyvi.ViTokenizer import tokenize
-# from sentence_transformers import SentenceTransformer
-
-
-# def split_text(text):
-#     text = text.translate(str.maketrans('', '', string.punctuation))
-#     words = text.lower().split()
-#     return [w for w in words if w.strip()]
-
-
-# class Retriever:
-#     def __init__(self, corpus, corpus_emb_path, model_name):
-#         self.corpus = corpus
-#         self.corpus_emb_path = corpus_emb_path
-#         self.model_name = model_name
-
-#         # Load model embedding
-#         self.embedder = SentenceTransformer(model_name)
-
-#         # Load embedding trực tiếp ở đây
-#         with open(self.corpus_emb_path, "rb") as f:
-#             self.embeddings = pickle.load(f)
-
-#         # Normalize embeddings
-#         self.embeddings = self.embeddings / np.linalg.norm(self.embeddings, axis=1, keepdims=True)
-        
-#         # BM25
-#         # for doc in self.corpus:
-#         #     if "passage" not in doc:
-#         #         doc["passage"] = doc.get("context", "")
-#         self.tokenized_corpus = [split_text(doc["passage"]) for doc in self.corpus]
-#         self.bm25 = BM25Okapi(self.tokenized_corpus)
-
-#     def retrieve(self, question: str, topk: int = 10):
-#         segmented_question = tokenize(question)
-#         query_emb = self.embedder.encode([segmented_question])[0]
-#         query_emb = query_emb / np.linalg.norm(query_emb)
-
-#         sim_scores = np.dot(self.embeddings, query_emb)
-
-#         tokenized_query = split_text(question)
-#         bm25_scores = self.bm25.get_scores(tokenized_query)
-#         max_bm25, min_bm25 = max(bm25_scores), min(bm25_scores)
-#         normalize = lambda x: (x - min_bm25 + 0.1) / (max_bm25 - min_bm25 + 0.1)
-
-#         results = []
-#         for i, doc in enumerate(self.corpus):
-#             bm25_score = bm25_scores[i]
-#             bm25_normed = normalize(bm25_score)
-#             sem_score = sim_scores[i]
-#             combined_score = bm25_normed * 0.4 + sem_score * 0.6
-#             results.append({
-#                 "id": doc["id"],
-#                 "title": doc.get("title", ""),
-#                 "context": doc.get("context", ""),
-#                 "bm25_score": bm25_score,
-#                 "semantic_score": sem_score,
-#                 "combined_score": combined_score
-#             })
-
-#         return sorted(results, key=lambda x: x["combined_score"], reverse=True)[:topk]
 import json
-import pickle
 import numpy as np
 import string
 from rank_bm25 import BM25Okapi
 from pyvi.ViTokenizer import tokenize
 from sentence_transformers import SentenceTransformer
-
+from qdrant_client import QdrantClient
 
 def split_text(text):
     """
@@ -84,21 +17,26 @@ def split_text(text):
 
 class Retriever:
     """
-    Lớp Retriever để tìm kiếm thông tin bằng cách kết hợp semantic search (embeddings)
+    Lớp Retriever để tìm kiếm thông tin bằng cách kết hợp semantic search (Qdrant)
     và lexical search (BM25).
     """
-    def __init__(self, corpus, corpus_emb_path, model_name):
+    def __init__(self, corpus, qdrant_path, model_name, collection_name="traffic_law"):
         """
         Khởi tạo Retriever.
 
         Args:
             corpus (list): Danh sách các tài liệu (mỗi tài liệu là một dict).
-            corpus_emb_path (str): Đường dẫn đến tệp pickle chứa embeddings của corpus.
+            qdrant_path (str): Đường dẫn đến thư mục chứa dữ liệu Qdrant (local).
             model_name (str): Tên hoặc đường dẫn đến mô hình SentenceTransformer.
+            collection_name (str): Tên collection trong Qdrant.
         """
         self.corpus = corpus
-        self.corpus_emb_path = corpus_emb_path
+        self.qdrant_path = qdrant_path
         self.model_name = model_name
+        self.collection_name = collection_name
+        
+        # Map ID to Doc for quick lookup
+        self.id_to_doc = {doc["id"]: doc for doc in self.corpus}
 
         # Tải mô hình embedding từ SentenceTransformers
         try:
@@ -106,107 +44,19 @@ class Retriever:
             print(f"Đã tải mô hình SentenceTransformer: {model_name}")
         except Exception as e:
             print(f"LỖI: Không thể tải mô hình SentenceTransformer '{model_name}': {e}")
-            raise # Re-raise the exception to stop execution
-
-
-        # Tải embeddings của corpus từ tệp pickle
-        self.embeddings = None # Khởi tạo an toàn
-        try:
-            print(f"Đang tải embeddings từ: {self.corpus_emb_path}")
-            with open(self.corpus_emb_path, "rb") as f:
-                loaded_embeddings_data = pickle.load(f)
-            
-            print(f"Dữ liệu embeddings tải về có kiểu: {type(loaded_embeddings_data)}")
-
-            # Nếu dữ liệu tải về là list, kiểm tra xem các phần tử có phải là dict không
-            # và trích xuất vector embedding thực sự từ key 'embedding'.
-            if isinstance(loaded_embeddings_data, list):
-                print("Dữ liệu là LIST. Đang kiểm tra cấu trúc bên trong và trích xuất embeddings.")
-                extracted_embeddings = []
-                for item in loaded_embeddings_data:
-                    if isinstance(item, dict) and 'embedding' in item:
-                        # Trích xuất numpy array từ key 'embedding'
-                        extracted_embeddings.append(item['embedding'])
-                    else:
-                        # Nếu có phần tử không phải dict hoặc không có key 'embedding'
-                        raise ValueError(f"Một phần tử trong list không phải dict hoặc không có key 'embedding': {item}")
-                
-                if extracted_embeddings:
-                    self.embeddings = np.array(extracted_embeddings)
-                    print(f"Đã chuyển đổi thành công list of dicts sang numpy array. Shape: {self.embeddings.shape}")
-                else:
-                    print("Cảnh báo: List embeddings tải về rỗng sau khi trích xuất hoặc không có embeddings hợp lệ.")
-                    self.embeddings = np.array([]) # Tạo mảng numpy rỗng
-
-            elif isinstance(loaded_embeddings_data, dict):
-                # Nếu dữ liệu tải về là dict (trường hợp mà chúng ta đã từng nghĩ là lỗi trước đó)
-                print("Dữ liệu là DICT. Đang cố gắng chuyển đổi values sang numpy array.")
-                if loaded_embeddings_data:
-                    first_value = next(iter(loaded_embeddings_data.values()))
-                    if isinstance(first_value, (list, np.ndarray)):
-                        self.embeddings = np.array(list(loaded_embeddings_data.values()))
-                        print(f"Đã chuyển đổi thành công dict (values) sang numpy array. Shape: {self.embeddings.shape}")
-                    else:
-                        raise TypeError(f"Giá trị trong dict không phải list hoặc np.ndarray. Kiểu: {type(first_value)}")
-                else:
-                    print("Cảnh báo: Dict embeddings tải về rỗng.")
-                    self.embeddings = np.array([]) # Tạo mảng numpy rỗng
-
-            elif isinstance(loaded_embeddings_data, np.ndarray):
-                print("Dữ liệu đã là NUMPY ARRAY. Sử dụng trực tiếp.")
-                self.embeddings = loaded_embeddings_data
-                print(f"Embeddings đã là numpy array. Shape: {self.embeddings.shape}")
-            else:
-                # Xử lý trường hợp kiểu dữ liệu không mong muốn
-                raise TypeError(f"Dữ liệu embeddings tải từ '{self.corpus_emb_path}' có kiểu không hợp lệ: {type(loaded_embeddings_data)}. Expected dict, list, or np.ndarray.")
-
-        except FileNotFoundError:
-            print(f"LỖI: Không tìm thấy tệp embeddings tại '{self.corpus_emb_path}'.")
-            raise
-        except Exception as e:
-            print(f"LỖI: Khi tải hoặc xử lý tệp embeddings '{self.corpus_emb_path}': {e}")
             raise
 
-        # --- Dòng code gây lỗi trước đó sẽ chạy SAU KHI self.embeddings được gán giá trị đúng ---
-        print(f"\nKiểm tra self.embeddings NGAY TRƯỚC khi chuẩn hóa:")
-        print(f"Kiểu của self.embeddings: {type(self.embeddings)}")
-        if isinstance(self.embeddings, np.ndarray):
-            print(f"Shape của self.embeddings: {self.embeddings.shape}")
-            if self.embeddings.ndim == 1:
-                print(f"Cảnh báo: Embeddings có dạng 1D. Điều này có thể không chính xác nếu embeddings có nhiều chiều (ví dụ 768).")
-                print(f"Dữ liệu đầu tiên của self.embeddings: {self.embeddings[0]}")
-            elif self.embeddings.ndim > 1 and self.embeddings.size > 0:
-                print(f"Dữ liệu đầu tiên của self.embeddings: {self.embeddings[0][:5]} (chỉ 5 phần tử đầu của vector đầu tiên)")
-            else:
-                print("self.embeddings là một numpy array rỗng hoặc có shape không xác định.")
-        elif self.embeddings is None:
-            print("self.embeddings vẫn là None! Có lỗi trong quá trình tải trước đó.")
-        else:
-            print(f"self.embeddings vẫn không phải numpy array sau khi xử lý: {self.embeddings}")
-
-
-        # Normalize embeddings
-        if self.embeddings is not None and isinstance(self.embeddings, np.ndarray) and self.embeddings.size > 0:
-            if self.embeddings.ndim < 2:
-                print("LỖI CẤU TRÚC: Embeddings cần có ít nhất 2 chiều để chuẩn hóa với axis=1. Đang thử reshape.")
-                try:
-                    self.embeddings = self.embeddings.reshape(-1, 1)
-                except ValueError as ve:
-                    print(f"LỖI: Không thể reshape embeddings thành 2 chiều. Lỗi: {ve}")
-                    raise
-            
-            if self.embeddings.shape[1] == 0:
-                print("Cảnh báo: Kích thước chiều thứ hai của embeddings là 0. Không thể chuẩn hóa.")
-                self.embeddings = np.array([]) 
-            else:
-                self.embeddings = self.embeddings / np.linalg.norm(self.embeddings, axis=1, keepdims=True)
-                print("Đã chuẩn hóa embeddings của corpus thành công.")
-        else:
-            print(f"Cảnh báo: Dữ liệu embeddings từ '{self.corpus_emb_path}' rỗng hoặc không đúng định dạng. Không thể chuẩn hóa.")
-            self.embeddings = np.array([]) 
-
+        # Kết nối Qdrant
+        print(f"Connecting to Qdrant at: {self.qdrant_path}")
+        self.client = QdrantClient(path=self.qdrant_path)
+        
+        # Kiểm tra collection
+        if not self.client.collection_exists(self.collection_name):
+            print(f"Cảnh báo: Collection '{self.collection_name}' không tồn tại trong Qdrant. Hãy chạy script migrate trước.")
 
         # BM25
+        # Tokenize corpus for BM25
+        print("Đang khởi tạo BM25...")
         self.tokenized_corpus = [split_text(doc.get("context", "")) for doc in self.corpus]
         
         if self.tokenized_corpus and any(len(x) > 0 for x in self.tokenized_corpus): 
@@ -219,79 +69,113 @@ class Retriever:
     def retrieve(self, question: str, topk: int = 10):
         """
         Tìm kiếm các tài liệu liên quan dựa trên câu hỏi.
+        Kết hợp Qdrant (Semantic) và BM25 (Lexical).
         """
-        if not (self.embeddings is not None and self.embeddings.size > 0 and self.embeddings.ndim >= 2):
-            print("Lỗi: Embeddings của corpus chưa được tải, rỗng hoặc không có cấu trúc 2D hợp lệ. Không thể thực hiện tìm kiếm semantic.")
-            return [] 
-
-        # Mã hóa câu hỏi thành embedding
+        # 1. Semantic Search with Qdrant
         segmented_question = tokenize(question)
-        query_emb = self.embedder.encode([segmented_question])[0] 
-
-        # Chuẩn hóa embedding của câu hỏi
-        norm_query_emb = np.linalg.norm(query_emb)
-        if norm_query_emb > 1e-9: 
-            query_emb = query_emb / norm_query_emb
-        else:
-            print("Cảnh báo: Embedding của câu hỏi là vector 0 (hoặc gần 0). Không thể chuẩn hóa, sử dụng vector gốc.")
-            pass 
-
-        # Tính điểm tương đồng cosine (semantic score)
-        if query_emb.ndim == 1:
-            sim_scores = np.dot(self.embeddings, query_emb)
-        else:
-            print("Cảnh báo: query_emb không phải 1D. Đang cố gắng tính np.dot trực tiếp. Có thể cần reshape query_emb.")
-            sim_scores = np.dot(self.embeddings, query_emb.T if query_emb.ndim > 1 and query_emb.shape[0] != self.embeddings.shape[1] else query_emb) 
-
-        # Tính điểm BM25
+        query_emb = self.embedder.encode([segmented_question])[0]
+        
+        # Chuẩn hóa vector nếu cần (Qdrant thường handle cosine, nhưng input vector nên được check)
+        # Tuy nhiên, nếu search bằng Cosine trong Qdrant, nó tự normalize.
+        # Ở đây ta gửi vector gốc.
+        
+        search_result = []
+        try:
+            search_result = self.client.search(
+                collection_name=self.collection_name,
+                query_vector=query_emb,
+                limit=topk * 2  # Lấy nhiều hơn topk để rerank
+            )
+        except Exception as e:
+            print(f"Lỗi khi tìm kiếm Qdrant: {e}")
+            
+        qdrant_hits = {hit.id: hit.score for hit in search_result}
+        
+        # 2. BM25 Search
         tokenized_query = split_text(question)
         
-        bm25_scores = []
+        bm25_hits = {}
         if self.bm25: 
             bm25_scores = self.bm25.get_scores(tokenized_query)
-        else:
-            bm25_scores = [0] * len(self.corpus)
-            print("Cảnh báo: BM25 không hoạt động do lỗi khởi tạo trước đó. Sử dụng điểm BM25 = 0.")
-
-
-        # Chuẩn hóa điểm BM25
-        max_bm25, min_bm25 = 0, 0
-        
-        # --- Dòng này đã được sửa để xử lý numpy array hoặc list một cách an toàn hơn ---
-        if isinstance(bm25_scores, np.ndarray) and bm25_scores.size > 0: 
-            max_bm25, min_bm25 = np.max(bm25_scores), np.min(bm25_scores) # Dùng np.max/min cho numpy array
-        elif isinstance(bm25_scores, list) and len(bm25_scores) > 0:
-            max_bm25, min_bm25 = max(bm25_scores), min(bm25_scores)
-        else:
-            pass # bm25_scores rỗng, giữ nguyên max_bm25 và min_bm25 là 0
-        
-        if (max_bm25 - min_bm25 + 0.1) == 0:
-            normalize_bm25 = lambda x: 0.5 
-            print("Cảnh báo: Tất cả điểm BM25 đều như nhau. Điểm chuẩn hóa BM25 sẽ là 0.5.")
-        else:
-            normalize_bm25 = lambda x: (x - min_bm25 + 0.1) / (max_bm25 - min_bm25 + 0.1)
-
-
-        results = []
-        for i, doc in enumerate(self.corpus):
-            if i >= len(bm25_scores) or i >= len(sim_scores):
-                print(f"Cảnh báo: Index {i} vượt quá kích thước của bm25_scores hoặc sim_scores. Bỏ qua tài liệu này.")
-                continue
-
-            bm25_score = bm25_scores[i]
-            bm25_normed = normalize_bm25(bm25_score) 
-            sem_score = sim_scores[i]
+            # Lấy top indices
+            # argsort trả về indices tăng dần, lấy slice cuối và đảo ngược
+            top_bm25_indices = np.argsort(bm25_scores)[-topk*2:][::-1]
             
-            combined_score = bm25_normed * 0.4 + sem_score * 0.6
+            for idx in top_bm25_indices:
+                score = bm25_scores[idx]
+                if score > 0:
+                    doc_id = self.corpus[idx]["id"]
+                    bm25_hits[doc_id] = score
+        else:
+             print("BM25 không hoạt động.")
+
+        # 3. Combine Scores
+        # Lấy tập hợp tất cả ID
+        all_candidate_ids = set(qdrant_hits.keys()) | set(bm25_hits.keys())
+        
+        # Tính Max/Min để chuẩn hóa
+        # Qdrant Score (Cosine Similarity or Dot Product)
+        # Nếu dùng Cosine trong Qdrant, score từ -1 đến 1 (hoặc 0-2 tùy implement, nhưng thường là cosine sim).
+        # Nếu dùng Dot Product (khi vector đã normalize), cũng là -1 đến 1.
+        
+        if qdrant_hits:
+            q_values = list(qdrant_hits.values())
+            max_q = max(q_values)
+            min_q = min(q_values)
+            if max_q == min_q:
+                norm_q_func = lambda x: 0.5
+            else:
+                norm_q_func = lambda x: (x - min_q) / (max_q - min_q)
+        else:
+            norm_q_func = lambda x: 0
+            
+        if bm25_hits:
+            b_values = list(bm25_hits.values())
+            max_b = max(b_values)
+            min_b = min(b_values)
+            if max_b == min_b:
+                norm_b_func = lambda x: 0.5
+            else:
+                norm_b_func = lambda x: (x - min_b) / (max_b - min_b)
+        else:
+            norm_b_func = lambda x: 0
+            
+        results = []
+        for doc_id in all_candidate_ids:
+            # Lấy document gốc
+            doc = self.id_to_doc.get(doc_id)
+            if not doc:
+                continue
+                
+            # Lấy điểm thành phần
+            q_score_raw = qdrant_hits.get(doc_id, 0.0) # Nếu không có trong Qdrant list, xem như thấp (hoặc 0)
+            # Lưu ý: Nếu doc không nằm trong top Qdrant, điểm thực tế có thể < min_q.
+            # Để an toàn, nếu không có trong hit, ta gán = 0 (đã chuẩn hóa sẽ thấp hơn min).
+            # Tuy nhiên, norm_q_func(0) có thể sai nếu min_q > 0.
+            # Cách tốt hơn: 
+            # q_score_norm = norm_q_func(q_score_raw) if doc_id in qdrant_hits else 0.0
+            
+            if doc_id in qdrant_hits:
+                q_score = norm_q_func(q_score_raw)
+            else:
+                q_score = 0.0 # Penalty cho việc không xuất hiện trong semantic top list
+                
+            b_score_raw = bm25_hits.get(doc_id, 0.0)
+            if doc_id in bm25_hits:
+                b_score = norm_b_func(b_score_raw)
+            else:
+                b_score = 0.0
+            
+            combined_score = b_score * 0.4 + q_score * 0.6
             
             results.append({
                 "id": doc.get("id"), 
                 "title": doc.get("title", ""),
                 "context": doc.get("context", ""),
-                "bm25_score": bm25_score,
-                "semantic_score": sem_score,
-                "combined_score": combined_score
+                "bm25_score": b_score_raw,
+                "semantic_score": q_score_raw,
+                "combined_score": combined_score,
+                "score_details": f"BM25: {b_score:.4f} (raw: {b_score_raw:.4f}), Sem: {q_score:.4f} (raw: {q_score_raw:.4f})"
             })
 
         return sorted(results, key=lambda x: x["combined_score"], reverse=True)[:topk]
-

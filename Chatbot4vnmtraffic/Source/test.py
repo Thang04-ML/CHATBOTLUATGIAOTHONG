@@ -1,40 +1,45 @@
-# main.py
+import sys
+import os
+
+# Ensure Source directory is in path
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from data_loader import load_meta_corpus
-from retriever import Retriever
-from smooth_context import smooth_contexts
-from chat import chatbot
+import chat 
 
-# Load corpus
-meta_corpus = load_meta_corpus("\data\chunked_data.jsonl")
-# for doc in meta_corpus:
-#     if "passage" not in doc:
-#         doc["passage"] = doc.get("context", "")
-
-# Initialize retriever
-retriever = Retriever(
-    corpus=meta_corpus,
-    corpus_emb_path="\data\corpus_embedding.pkl",
-    model_name="\model\halong_embedding"
-)
+# Initialize retriever via chat module to avoid multiple QdrantClient instances locking the DB
+print("Initializing Retriever via chat module...")
+chat.init_retriever()
+retriever = chat.retriever
 
 # Query example
 question = "Đối tượng tham gia giao thông bao gồm những ai?"
-top_results = retriever.retrieve(question, topk=10)
-for doc in top_results:
-    if "passage" not in doc:
-        doc["passage"] = doc.get("context", "")
+print(f"Querying: {question}")
+top_results = retriever.retrieve(question, topk=5)
 
-# Smooth contexts
-smoothed_contexts = smooth_contexts(top_results, meta_corpus)
+print("\nTop Results (Independent Retriever):")
+for i, res in enumerate(top_results):
+    print(f"[{i+1}] Score: {res['combined_score']:.4f} ({res.get('score_details', '')})")
+    print(f"    ID: {res['id']}")
+    print(f"    Content: {res['context'][:100]}...")
+    print("-" * 50)
 
-# Display results
-# for context in smoothed_contexts:
-#     print(context["passage"], context["score"])
-# {"role": "user", "content": "Địa điểm du lịch ở An Giang?"},
-#                 {"role": "system", "content": "An Giang có nhiều điểm du lịch thú vị."},
-# Chatbot interaction
+# Test Chatbot Function
+print("\nTesting Chatbot Function...")
 conversation_history = [
-                {"role": "user", "content": "Chào bạn, bạn biết về luật giao thông việt nam chứ?"}]
-response = chatbot(conversation_history, "Tiếng Việt")
+    {"role": "user", "content": "Chào bạn, bạn biết về luật giao thông việt nam chứ?"},
+]
+
+response = chat.chatbot(conversation_history, "Tiếng Việt")
+print("\nChatbot Response (Small Talk test):")
 print(response)
+
+conversation_history_2 = [
+    {"role": "user", "content": "Vượt đèn đỏ phạt bao nhiêu?"}
+]
+print("\nChatbot Response (Domain Question test):")
+try:
+    response_2 = chat.chatbot(conversation_history_2, "Tiếng Việt")
+    print(response_2)
+except Exception as e:
+    print(f"Error calling chatbot: {e}")

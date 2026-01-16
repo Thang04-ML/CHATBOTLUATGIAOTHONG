@@ -1,11 +1,21 @@
 from typing import List
 from fastapi import FastAPI
 from pydantic import BaseModel
-from chat import chatbot
+from contextlib import asynccontextmanager
+from chat import chatbot, init_retriever
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: Load the model
+    print("Starting up... Warming up the model.")
+    init_retriever()
+    print("Model loaded.")
+    yield
+    # Shutdown: Clean up resources if needed
+    print("Shutting down...")
 
 # Khởi tạo ứng dụng FastAPI
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 
 # Định nghĩa dữ liệu đầu vào cho API
 class Message(BaseModel):

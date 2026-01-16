@@ -187,10 +187,11 @@ retriever = None
 def init_retriever():
     global retriever
     if retriever is None:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
         retriever = Retriever(
             corpus=load_meta_corpus(),
-            corpus_emb_path=r"D:\UIT\monchieut6\Chatbot4vnmtraffic\Chatbot4vnmtraffic\Source\data\corpus_embedding.pkl",
-            model_name=r"D:\UIT\monchieut6\Chatbot4vnmtraffic\Chatbot4vnmtraffic\Source\model\halong_embedding"
+            qdrant_path=os.path.join(base_dir, "data", "qdrant_db"),
+            model_name=os.path.join(base_dir, "model", "halong_embedding")
         )
 
 #############

@@ -109,7 +109,7 @@ def classify_small_talk(input_sentence, chat_history, language):
 
     prompt = f"""
     ###Yêu cầu: Bạn là một trợ lý chuyên gia phân loại nội dung cho Chatbot Pháp luật Giao thông Việt Nam.
-    Nhiệm vụ của bạn là xác định liệu câu hỏi của người dùng là "Small Talk" hay là "Nội dung liên quan đến Luật Giao thông".
+    Nhiệm vụ của bạn là xác định liệu câu hỏi của người dùng là "Small Talk/Lời xác nhận" hay là "Nội dung cần tra cứu/thảo luận Luật Giao thông".
 
     ###Lịch sử cuộc trò chuyện (để hiểu ngữ cảnh):
     {formatted_history}
@@ -117,22 +117,21 @@ def classify_small_talk(input_sentence, chat_history, language):
     ###Quy tắc phân loại:
     1. Trả về "no" nếu câu hỏi:
        - Liên quan trực tiếp đến quy định, mức phạt, luật giao thông.
-       - Là CÂU HỎI TIẾP NỐI (vừa rồi bạn nói xe máy, còn ô tô thì sao?).
-       - Là PHẢN HỒI/TRANH LUẬN/THẮC MẮC về câu trả lời trước đó (ví dụ: "sao rẻ thế?", "tôi không tin", "có nhầm không?", "cụ thể hơn đi").
-       - Tất cả những gì liên quan đến luồng thảo luận về luật giao thông đều là "no".
+       - Là CÂU HỎI TIẾP NỐI ngữ cảnh (ví dụ: "còn ô tô thì sao?", "xe máy thì phạt bao nhiêu?").
+       - Là PHẢN ĐỐI/TRANH LUẬN/THẮC MẮC về nội dung câu trả lời (ví dụ: "sao rẻ thế?", "tôi không tin", "có nhầm không?", "cụ thể hơn đi", "tại sao lại như vậy?").
 
     2. Trả về "Câu trả lời Small talk" nếu:
-       - Câu hỏi là chào hỏi (hello, hi, chào bạn).
-       - Câu hỏi là cảm ơn (thanks, cảm ơn nhé).
-       - Câu hỏi về thông tin cá nhân của bot (bạn là ai, bạn bao nhiêu tuổi, bạn có biết lái xe không).
-       - Câu hỏi hoàn toàn không liên quan đến giao thông.
+       - Câu hỏi là chào hỏi, cảm ơn.
+       - Là LỜI XÁC NHẬN/ĐỒNG Ý/KẾT THÚC đơn giản không có ý định hỏi thêm (ví dụ: "ok", "vâng", "đúng rồi", "hiểu rồi", "đã rõ", "cảm ơn bạn"). 
+       - Câu hỏi ngoài lề không liên quan đến luật pháp.
        
-    LƯU Ý: Nếu là Small talk, hãy trả về một câu chào mừng hoặc giới thiệu ngắn gọn bằng ngôn ngữ {language}. Nếu là nội dung liên quan đến luật, CHỈ trả về duy nhất từ "no".
+    LƯU Ý: Nếu thuộc nhóm (2), hãy trả lời lịch sự và hỏi xem có giúp gì thêm được không bằng ngôn ngữ {language}. Nếu thuộc nhóm (1), CHỈ trả về duy nhất từ "no".
 
     ###Ví dụ:
-    User: "Sao rẻ thế?" (Ngữ cảnh đang nói về mức phạt) -> Response: "no"
-    User: "Cảm ơn bạn nhé" -> Response: "Rất vui được hỗ trợ bạn. Tôi có thể giúp gì thêm về luật giao thông không?"
-    User: "Bạn có khỏe không?" -> Response: "Tôi là một AI, luôn sẵn sàng giúp bạn tìm hiểu luật giao thông Việt Nam. Bạn có thắc mắc gì không?"
+    User: "ok" -> Response: "Rất vui vì bạn đã nắm rõ thông tin. Bạn còn thắc mắc nào khác về luật giao thông không?"
+    User: "Sao rẻ thế?" (Liên quan đến mức phạt đã nhắc) -> Response: "no"
+    User: "Hiểu rồi, cảm ơn bạn" -> Response: "Không có gì, tôi luôn sẵn sàng hỗ trợ. Bạn có muốn tra cứu thêm quy định nào khác không?"
+    User: "Tôi không tin" (Nghi ngờ tính chính xác của luật) -> Response: "no"
 
     ###Câu hỏi hiện tại từ người dùng:
     {input_sentence}"""

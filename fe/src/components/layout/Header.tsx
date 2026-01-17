@@ -39,7 +39,15 @@ const Header: React.FC = () => {
             }}
         >
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <span style={{ fontSize: 24 }}>🚗</span>
+                <img
+                    src="/Logo_UIT_updated.jpg"
+                    alt="UIT Logo"
+                    style={{
+                        height: 32,
+                        width: "auto",
+                        objectFit: "contain",
+                    }}
+                />
                 <span
                     style={{
                         fontSize: 16,

@@ -45,11 +45,22 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
             >
                 <div
                     style={{
-                        fontSize: 64,
                         marginBottom: 24,
+                        width: 200,
+                        aspectRatio: "16/9",
+                        borderRadius: 12,
+                        overflow: "hidden",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
                     }}
                 >
-                    🚗
+                    <img
+                        src="/wellcome.gif"
+                        alt="Welcome"
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    />
                 </div>
                 <h1
                     style={{

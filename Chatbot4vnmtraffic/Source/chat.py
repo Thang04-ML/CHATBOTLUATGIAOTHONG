@@ -100,71 +100,42 @@ def get_prompt(question, contexts, language):
     return prompt
 
 
-# def classify_small_talk(input_sentence, language):
-#     prompt = f"""
-#     ### Mục tiêu
-#     Bạn là một trợ lý ảo chuyên về **tư vấn học vụ** của Trường Đại học Công Nghệ Thông Tin. Nhiệm vụ của bạn là **phân loại** mỗi câu hỏi của người dùng thành hai loại:
 
-#     1. **Small talk**: các câu chào hỏi, hỏi thăm, cảm ơn, khen ngợi, hay hỏi thông tin cá nhân… **KHÔNG liên quan** đến học vụ.  
-#     2. **Domain question**: các câu hỏi **liên quan** trực tiếp đến học vụ (ví dụ: chương trình đào tạo, học phí, tín chỉ, lịch thi, quy định…)
+def classify_small_talk(input_sentence, chat_history, language):
+    formatted_history = ""
+    for msg in chat_history:
+        role = "Người dùng" if msg['role'] == 'user' else "Trợ lý"
+        formatted_history += f"{role}: {msg['content']}\n"
 
-#     ### Quy tắc trả lời
-#     - Nếu là **Domain question**, chỉ trả về **chính xác** từ **"no"** (không thêm bất kỳ ký tự, câu giải thích nào).  
-#     - Nếu là **Small talk**, không trả “no” mà trả về một thông điệp chào mời ngắn gọn, chuyên nghiệp, thân thiện, giới thiệu về chatbot tư vấn học vụ Trường ĐH CNTT, bằng ngôn ngữ {language}.
-
-#     ### Ví dụ minh họa
-
-#     User query: "Chào bạn, hôm nay bạn thế nào?"  
-#     Response: "Xin chào! Mình là chatbot tư vấn học vụ Trường Đại học Công Nghệ Thông Tin—sẵn sàng hỗ trợ bạn với mọi thắc mắc về chương trình đào tạo, học phí và học phần. Hãy cho mình biết câu hỏi của bạn nhé! 😊"
-
-#     User query: "Điểm số để miễn Anh Văn 2 là bao nhiêu?"  
-#     Response: "no"
-
-#     User query: "Bạn tên là gì?"  
-#     Response: "Xin chào! Mình là chatbot tư vấn học vụ Trường Đại học Công Nghệ Thông Tin—sẵn sàng hỗ trợ bạn với mọi thắc mắc về chương trình đào tạo, lịch thi, học phí và học phần. Hãy cho mình biết câu hỏi học vụ của bạn nhé! 😊"
-
-#     User query: "Chương trình tiên tiến là gì?"  
-#     Response: "no"
-
-#     User query: "Cảm ơn!"  
-#     Response: "Cảm ơn bạn đã tin tưởng! Mình là chatbot tư vấn học vụ Trường Đại học Công Nghệ Thông Tin—luôn sẵn sàng giải đáp mọi thắc mắc liên quan đến chương trình đào tạo, tín chỉ và học phần. Hãy hỏi mình bất cứ điều gì về học vụ nhé! 😊"
-
-#     ### Thực thi phân loại
-#     Dựa vào câu hỏi của người dùng, thực hiện đúng quy tắc trên.  
-#     Câu hỏi từ người dùng: {input_sentence}
-#     """
-
-
-#     completion = client.chat.completions.create(
-#       model="gpt-4o-mini",
-#       messages=[
-#         {"role": "user", "content": prompt}
-#       ]
-#     )
-
-def classify_small_talk(input_sentence, language):
     prompt = f"""
-    ###Yêu cầu: Bạn là một trợ lý hữu ích được thiết kế để phân loại các câu hỏi của người dùng trong ngữ cảnh của một chatbot về Pháp luật Giao thông Việt Nam. Nhiệm vụ của bạn là xác định liệu câu hỏi của người dùng có phải là "small talk" (chào hỏi, cảm ơn, hỏi thăm ngoài lề) hay không.
-    ###"Small talk" đề cập đến những chủ đề trò chuyện thông thường, không liên quan trực tiếp đến các quy định, luật lệ, mức phạt trong giao thông Việt Nam.
-    - Nếu câu hỏi KHÔNG phải là small talk và liên quan đến luật giao thông (ví dụ: hỏi về mức phạt, quy định về nồng độ cồn, tốc độ tối đa), bạn PHẢI trả về duy nhất từ "no".
-    - Nếu câu hỏi là "small talk": Không trả lời câu hỏi đó, thay vào đó hãy giới thiệu về chức năng của chatbot tư vấn pháp luật giao thông một cách ngắn gọn, chuyên nghiệp bằng ngôn ngữ: {language}.
+    ###Yêu cầu: Bạn là một trợ lý chuyên gia phân loại nội dung cho Chatbot Pháp luật Giao thông Việt Nam.
+    Nhiệm vụ của bạn là xác định liệu câu hỏi của người dùng là "Small Talk" hay là "Nội dung liên quan đến Luật Giao thông".
+
+    ###Lịch sử cuộc trò chuyện (để hiểu ngữ cảnh):
+    {formatted_history}
+
+    ###Quy tắc phân loại:
+    1. Trả về "no" nếu câu hỏi:
+       - Liên quan trực tiếp đến quy định, mức phạt, luật giao thông.
+       - Là CÂU HỎI TIẾP NỐI (vừa rồi bạn nói xe máy, còn ô tô thì sao?).
+       - Là PHẢN HỒI/TRANH LUẬN/THẮC MẮC về câu trả lời trước đó (ví dụ: "sao rẻ thế?", "tôi không tin", "có nhầm không?", "cụ thể hơn đi").
+       - Tất cả những gì liên quan đến luồng thảo luận về luật giao thông đều là "no".
+
+    2. Trả về "Câu trả lời Small talk" nếu:
+       - Câu hỏi là chào hỏi (hello, hi, chào bạn).
+       - Câu hỏi là cảm ơn (thanks, cảm ơn nhé).
+       - Câu hỏi về thông tin cá nhân của bot (bạn là ai, bạn bao nhiêu tuổi, bạn có biết lái xe không).
+       - Câu hỏi hoàn toàn không liên quan đến giao thông.
+       
+    LƯU Ý: Nếu là Small talk, hãy trả về một câu chào mừng hoặc giới thiệu ngắn gọn bằng ngôn ngữ {language}. Nếu là nội dung liên quan đến luật, CHỈ trả về duy nhất từ "no".
 
     ###Ví dụ:
-    User query: "Chào bạn"
-    Response: "Xin chào, tôi là trợ lý AI chuyên tư vấn về pháp luật giao thông đường bộ tại Việt Nam. Tôi có thể giúp bạn tra cứu các quy định, mức phạt và giải đáp các thắc mắc liên quan. Hãy đặt câu hỏi cho tôi nhé!"
-    User query: "Vượt đèn đỏ bị phạt bao nhiêu tiền?"
-    Response: "no"
-    User query: "Bạn có biết lái xe không?"
-    Response: "Tôi là một mô hình ngôn ngữ, được tạo ra để cung cấp thông tin về pháp luật giao thông. Tôi có thể giúp bạn tra cứu các quy định và mức phạt. Bạn có câu hỏi nào cần giải đáp không?"
-    User query: "Nồng độ cồn cho phép khi lái xe máy là bao nhiêu?"
-    Response: "no"
-    User query: "Tốc độ tối đa trong khu dân cư là bao nhiêu?"
-    Response: "no"
-    User query: "Cảm ơn bạn nhé"
-    Response: "Rất vui được hỗ trợ bạn. Nếu có bất kỳ câu hỏi nào khác về luật giao thông, đừng ngần ngại hỏi nhé!"
-    
-    ###Dựa trên câu hỏi từ người dùng, hãy thực hiện đúng yêu cầu.
-    Câu hỏi từ người dùng: {input_sentence}"""
+    User: "Sao rẻ thế?" (Ngữ cảnh đang nói về mức phạt) -> Response: "no"
+    User: "Cảm ơn bạn nhé" -> Response: "Rất vui được hỗ trợ bạn. Tôi có thể giúp gì thêm về luật giao thông không?"
+    User: "Bạn có khỏe không?" -> Response: "Tôi là một AI, luôn sẵn sàng giúp bạn tìm hiểu luật giao thông Việt Nam. Bạn có thắc mắc gì không?"
+
+    ###Câu hỏi hiện tại từ người dùng:
+    {input_sentence}"""
 
     completion = client.chat.completions.create(
         model="gpt-4o-mini",
@@ -176,11 +147,16 @@ def classify_small_talk(input_sentence, language):
     return answer.strip().lower()
 
 def create_new_prompt(prompt, chat_history, user_query, **kwargs):
-  new_prompt = f"{prompt} lịch sử cuộc trò chuyện: {chat_history} câu hỏi của người dùng: {user_query}"
-  for key, value in kwargs.items():
-    new_prompt += f" {key}: {value}"
+    formatted_history = ""
+    for msg in chat_history:
+        role = "Người dùng" if msg['role'] == 'user' else "Trợ lý"
+        formatted_history += f"{role}: {msg['content']}\n"
+    
+    new_prompt = f"{prompt}\n\n### Lịch sử cuộc trò chuyện:\n{formatted_history}\n### Câu hỏi mới nhất của người dùng: {user_query}\n\nCâu hỏi độc lập:"
+    for key, value in kwargs.items():
+        new_prompt += f"\n{key}: {value}"
 
-  return new_prompt
+    return new_prompt
 ###########
 retriever = None
 
@@ -213,24 +189,33 @@ def chatbot(conversation_history: List[Dict[str, str]], language) -> str:
     # )
 ##############
 
+    # Lấy tối đa 10 tin nhắn gần nhất làm ngữ cảnh (khoảng 5 lượt hội thoại, không bao gồm câu hỏi hiện tại)
+    history_context = conversation_history[:-1][-10:]
+
     # Xử lý nếu người dùng có câu hỏi nhỏ hoặc trò chuyện phiếm
-    result = classify_small_talk(user_query, language)
-    print("result classify small talk:", result)
+    result = classify_small_talk(user_query, history_context, language)
+    print(f"--- DEBUG: Classification Result for '{user_query}': {result}")
+    
     if "no" not in result:
         return result
 
     elif "no" in result:
-        prompt = """Dựa trên lịch sử cuộc trò chuyện và câu hỏi mới nhất của người dùng, có thể tham chiếu đến ngữ cảnh trong lịch sử trò chuyện, 
-            hãy tạo thành một câu hỏi độc lập có thể hiểu được mà không cần lịch sử cuộc trò chuyện. 
-            KHÔNG trả lời câu hỏi, chỉ cần điều chỉnh lại nếu cần, nếu không thì giữ nguyên. 
-            Nếu câu hỏi bằng tiếng Anh, sau khi tinh chỉnh, hãy dịch câu hỏi đó sang tiếng Việt."""
+        prompt = """Nhiệm vụ của bạn là dựa trên lịch sử cuộc trò chuyện và câu hỏi mới nhất của người dùng, 
+            hãy tạo thành một câu hỏi độc lập, đầy đủ ngữ cảnh để có thể tìm kiếm trong cơ sở dữ liệu luật giao thông. 
+            
+            Yêu cầu:
+            1. Tuyệt đối không trả lời câu hỏi.
+            2. Nếu câu hỏi mới sử dụng đại từ hoặc có ý nghĩa tiếp nối (ví dụ: "cụ thể hơn", "xe máy thì sao?", "mức phạt đó...", "ai là đối tượng?") 
+               hãy bổ sung các thực thể từ lịch sử để câu hỏi trở nên rõ ràng và đầy đủ.
+            3. Nếu câu hỏi đã độc lập, giữ nguyên nội dung.
+            4. Nếu câu hỏi bằng tiếng Anh, hãy dịch sang tiếng Việt sau khi tinh chỉnh.
+            5. Chỉ trả về duy nhất câu hỏi đã được điều chỉnh."""
 
         new_prompt = create_new_prompt(
             prompt=prompt,
-            chat_history=conversation_history,
+            chat_history=history_context,
             user_query=user_query,
         )
-
         completion = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
@@ -251,7 +236,8 @@ def chatbot(conversation_history: List[Dict[str, str]], language) -> str:
         # print("Smooth context: ", smoothed_contexts)
         # prompt = get_prompt(question, smoothed_contexts, language)
         prompt = get_prompt(question, top_passages, language)
-        print(prompt)
+        print("Bắt đầu promt:",prompt)
+        print("Kết thúc promt")
         
         completion = client.chat.completions.create(
             model="gpt-4o-mini",

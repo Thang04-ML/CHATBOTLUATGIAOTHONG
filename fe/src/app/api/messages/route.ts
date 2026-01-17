@@ -106,8 +106,8 @@ Nếu bạn cho rằng câu trả lời chưa chính xác, bạn có thể:
         ];
 
         const contextMessages = isComparison
-            ? allMessages.slice(-4)
-            : allMessages.slice(-3);
+            ? allMessages.slice(-15) // Thêm nhiều hơn cho so sánh
+            : allMessages.slice(-11); // Tối thiểu 5 cặp câu hỏi - trả lời + câu hỏi hiện tại
 
         // 6. Call backend API
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8000";

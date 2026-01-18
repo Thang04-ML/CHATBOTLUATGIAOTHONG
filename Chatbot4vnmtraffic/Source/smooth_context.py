@@ -22,7 +22,14 @@ def merge_contexts(passages):
     b = 0
     for ids in consecutive_ids:
         psgs = passages_sorted_by_id[b:b+len(ids)]
-        psg_texts = [x["passage"].strip("Title: ").strip(x["title"]).strip() for x in psgs]
+        def get_clean_text(p):
+            t = p.get("passage") or p.get("context") or ""
+            title_prefix = f"Title: {p['title']}\n\n"
+            if t.startswith(title_prefix):
+                return t[len(title_prefix):].strip()
+            return t.strip()
+
+        psg_texts = [get_clean_text(x) for x in psgs]
         merged = f"Title: {psgs[0]['title']}\n\n" + " ".join(psg_texts)
         b = b + len(ids)
         merged_contexts.append(dict(
@@ -50,27 +57,39 @@ def expand_context(passage, meta_corpus, word_window=60, n_sent=3):
     title = passage["title"]
     prev_id = merged_from_ids[0] - 1
     next_id = merged_from_ids[-1] + 1
-    strip_title = lambda x: x["passage"].strip(f"Title: {x['title']}\n\n")
+    
+    def strip_title_func(x):
+        t = x.get("passage") or x.get("context") or ""
+        title_prefix = f"Title: {x['title']}\n\n"
+        if t.startswith(title_prefix):
+            return t[len(title_prefix):].strip()
+        return t.strip()
     
     texts = []
-    if prev_id in range(0, len(meta_corpus)):
+    if prev_id >= 0 and prev_id < len(meta_corpus):
         prev_psg = meta_corpus[prev_id]
         if prev_psg["title"] == title: 
-            prev_text = strip_title(prev_psg)
+            prev_text = strip_title_func(prev_psg)
             prev_text = " ".join(sent_tokenize(prev_text)[-n_sent:])
             texts.append(prev_text)
             
-    texts.append(strip_title(passage))
+    # Get current passage text without title prefix
+    current_text = passage.get("passage") or passage.get("context") or ""
+    title_prefix = f"Title: {title}\n\n"
+    if current_text.startswith(title_prefix):
+        current_text = current_text[len(title_prefix):]
     
-    if next_id in range(0, len(meta_corpus)):
+    texts.append(current_text.strip())
+    
+    if next_id >= 0 and next_id < len(meta_corpus):
         next_psg = meta_corpus[next_id]
         if next_psg["title"] == title: 
-            next_text = strip_title(next_psg)
+            next_text = strip_title_func(next_psg)
             next_text = " ".join(sent_tokenize(next_text)[:n_sent])
             texts.append(next_text)
 
     expanded_text = " ".join(texts)
-    expanded_text = f"Title: {title}\n{expanded_text}"
+    expanded_text = f"Title: {title}\n\n{expanded_text}"
     new_passage = deepcopy(passage)
     new_passage["passage"] = expanded_text
     return new_passage

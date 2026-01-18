@@ -41,8 +41,8 @@ prompt_template = (
 
     1. Chỉ sử dụng nội dung có trong dữ liệu được cung cấp để trả lời câu hỏi.
     - TUYỆT ĐỐI KHÔNG sử dụng kiến thức bên ngoài, kinh nghiệm cá nhân hoặc thông tin từ internet.
-    - KHÔNG được kết nối thông tin trong văn bản với kiến thức bên ngoài (ví dụ: nếu văn bản nói "vi phạm nghiêm trọng bị truy cứu hình sự" nhưng KHÔNG nêu hành vi cụ thể là "đánh người", bạn KHÔNG được tự ý kết luận hành vi đó bị truy cứu hình sự).
-    - Nếu thông tin KHÔNG có trong văn bản, bạn PHẢI trả lời: "Xin lỗi, tôi không tìm thấy thông tin pháp lý cụ thể trong dữ liệu được cung cấp để trả lời câu hỏi này."
+    - KHÔNG được kết nối thông tin trong văn bản với kiến thức bên ngoài  
+    - KHÔNG được tự ý kết luận, suy luận các thông tin không có trong văn bản.
 
     2. Phân tích kỹ lưỡng dữ liệu truy xuất để trả lời đúng trọng tâm câu hỏi.
     - Câu trả lời phải dựa trên sự kiện và con số cụ thể có trong văn bản.
@@ -87,9 +87,10 @@ prompt_template = (
     ### Câu hỏi từ người dùng:
     {question}
     ### Yêu cầu trả lời:
-    - Kiểm tra xem hành vi trong câu hỏi có xuất hiện trong dữ liệu trên không.
-    - Nếu CÓ: Trả lời dựa trên dữ liệu đó.
-    - Nếu KHÔNG CÓ hoặc chỉ có thông tin chung chung không đủ để trả lời cụ thể: Tuyệt đối không tự suy luận, hãy trả lời rằng không tìm thấy thông tin cụ thể.
+    - Kiểm tra xem các yếu tố trong câu hỏi (đối tượng, hành vi, mức phạt) có xuất hiện trong dữ liệu trên không. 
+    - Vì dữ liệu có thể bị chia nhỏ thành nhiều phần (fragmented), hãy kết hợp thông tin từ nhiều đoạn (Context [x]) nếu chúng có vẻ liên quan đến cùng một điều luật hoặc cùng một nhóm đối tượng.
+    - Nếu CÓ thông tin: Trả lời chi tiết, dẫn chứng các con số cụ thể.
+    - Nếu TUYỆT ĐỐI không có thông tin hoặc thông tin quá mơ hồ không thể xác định: Hãy trả lời rằng không tìm thấy thông tin cụ thể.
 
     ### Hãy trả lời chi tiết và đầy đủ dựa trên nội dung liên quan trong dữ liệu đã cung cấp.
     Nếu không có thông tin phù hợp, hãy tuân thủ đúng các quy tắc từ chối đã nêu ở trên."""
@@ -126,20 +127,30 @@ def classify_small_talk(input_sentence, chat_history, language):
     1. Trả về "no" nếu câu hỏi:
        - Liên quan trực tiếp đến quy định, mức phạt, luật giao thông.
        - Là CÂU HỎI TIẾP NỐI ngữ cảnh (ví dụ: "còn ô tô thì sao?", "xe máy thì phạt bao nhiêu?").
-       - Là PHẢN ĐỐI/TRANH LUẬN/THẮC MẮC về nội dung câu trả lời (ví dụ: "sao rẻ thế?", "tôi không tin", "có nhầm không?", "cụ thể hơn đi", "tại sao lại như vậy?").
+       - Là PHẢN ĐỐI/TRANH LUẬN/THẮC MẮC về nội dung câu trả lời 
 
     2. Trả về "Câu trả lời Small talk" nếu:
        - Câu hỏi là chào hỏi, cảm ơn.
-       - Là LỜI XÁC NHẬN/ĐỒNG Ý/KẾT THÚC đơn giản không có ý định hỏi thêm (ví dụ: "ok", "vâng", "đúng rồi", "hiểu rồi", "đã rõ", "cảm ơn bạn"). 
+       - Là LỜI XÁC NHẬN/ĐỒNG Ý/KẾT THÚC đơn giản không có ý định hỏi thêm
        - Câu hỏi ngoài lề không liên quan đến luật pháp.
        
     LƯU Ý: Nếu thuộc nhóm (2), hãy trả lời lịch sự và hỏi xem có giúp gì thêm được không bằng ngôn ngữ {language}. Nếu thuộc nhóm (1), CHỈ trả về duy nhất từ "no".
 
     ###Ví dụ:
-    User: "ok" -> Response: "Rất vui vì bạn đã nắm rõ thông tin. Bạn còn thắc mắc nào khác về luật giao thông không?"
-    User: "Sao rẻ thế?" (Liên quan đến mức phạt đã nhắc) -> Response: "no"
-    User: "Hiểu rồi, cảm ơn bạn" -> Response: "Không có gì, tôi luôn sẵn sàng hỗ trợ. Bạn có muốn tra cứu thêm quy định nào khác không?"
-    User: "Tôi không tin" (Nghi ngờ tính chính xác của luật) -> Response: "no"
+    User query: "Chào bạn"
+    Response: "Xin chào, tôi là trợ lý AI chuyên tư vấn về pháp luật giao thông đường bộ tại Việt Nam. Tôi có thể giúp bạn tra cứu các quy định, mức phạt và giải đáp các thắc mắc liên quan. Hãy đặt câu hỏi cho tôi nhé!"
+    User query: "Vượt đèn đỏ bị phạt bao nhiêu tiền?"
+    Response: "no"
+    User: "ok"
+    Response: "Rất vui vì bạn đã nắm rõ thông tin. Bạn còn thắc mắc nào khác về luật giao thông không?"
+    User query: "Sao rẻ thế?" (Liên quan đến mức phạt đã nhắc)
+    Response: "no"
+    User query: "Hiểu rồi, cảm ơn bạn"
+    Response: "Không có gì, tôi luôn sẵn sàng hỗ trợ. Bạn có muốn tra cứu thêm quy định nào khác không?"
+    User query: "Tôi không tin" (Nghi ngờ tính chính xác của luật)
+    Response: "no"
+    User query: "Cụ thể hơn đi" (yêu cầu trình bày rõ ràng hơn câu trả lời trước đó)
+    Response: "no"
 
     ###Câu hỏi hiện tại từ người dùng:
     {input_sentence}"""
@@ -166,13 +177,22 @@ def create_new_prompt(prompt, chat_history, user_query, **kwargs):
     return new_prompt
 ###########
 retriever = None
+meta_corpus = None
 
 def init_retriever():
-    global retriever
+    global retriever, meta_corpus
     if retriever is None:
         base_dir = os.path.dirname(os.path.abspath(__file__))
+        meta_corpus = load_meta_corpus()
+        # Ensure all docs have both 'passage' and 'context' keys
+        for doc in meta_corpus:
+            if "passage" not in doc:
+                doc["passage"] = doc.get("context", "")
+            if "context" not in doc:
+                doc["context"] = doc.get("passage", "")
+                
         retriever = Retriever(
-            corpus=load_meta_corpus(),
+            corpus=meta_corpus,
             qdrant_path=os.path.join(base_dir, "data", "qdrant_db"),
             model_name=os.path.join(base_dir, "model", "halong_embedding")
         )
@@ -181,20 +201,6 @@ def init_retriever():
 def chatbot(conversation_history: List[Dict[str, str]], language) -> str:
     init_retriever()
     user_query = conversation_history[-1]['content']
-
-    # meta_corpus = load_meta_corpus(r"ChatBotUIT-master\data\DS108_chunked_data.jsonl")
-    meta_corpus = load_meta_corpus()
-    # for doc in meta_corpus:
-    #     if "passage" not in doc:
-    #         doc["passage"] = doc.get("context", "")
-
-##############
-    # retriever = Retriever(
-    #     corpus=meta_corpus,
-    #     corpus_emb_path=r"..\data\embed_new_chunked_haLong.pkl",
-    #     model_name="..\\model\\halong_embedding"
-    # )
-##############
 
     # Lấy tối đa 10 tin nhắn gần nhất làm ngữ cảnh (khoảng 5 lượt hội thoại, không bao gồm câu hỏi hiện tại)
     history_context = conversation_history[:-1][-10:]
@@ -212,8 +218,7 @@ def chatbot(conversation_history: List[Dict[str, str]], language) -> str:
             
             Yêu cầu:
             1. Tuyệt đối không trả lời câu hỏi.
-            2. Nếu câu hỏi mới sử dụng đại từ hoặc có ý nghĩa tiếp nối (ví dụ: "cụ thể hơn", "xe máy thì sao?", "mức phạt đó...", "ai là đối tượng?") 
-               hãy bổ sung các thực thể từ lịch sử để câu hỏi trở nên rõ ràng và đầy đủ.
+            2. Nếu câu hỏi mới sử dụng đại từ hoặc có ý nghĩa tiếp nối, hãy bổ sung các thực thể từ lịch sử để câu hỏi trở nên rõ ràng và đầy đủ.
             3. Nếu câu hỏi đã độc lập, giữ nguyên nội dung.
             4. Nếu câu hỏi bằng tiếng Anh, hãy dịch sang tiếng Việt sau khi tinh chỉnh.
             5. Chỉ trả về duy nhất câu hỏi đã được điều chỉnh."""
@@ -239,10 +244,9 @@ def chatbot(conversation_history: List[Dict[str, str]], language) -> str:
                 doc["passage"] = doc.get("context", "")
 
         print("topK:", top_passages)
-        # smoothed_contexts = smooth_contexts(top_passages, meta_corpus)
-        # print("Smooth context: ", smoothed_contexts)
-        # prompt = get_prompt(question, smoothed_contexts, language)
-        prompt = get_prompt(question, top_passages, language)
+        smoothed_contexts = smooth_contexts(top_passages, meta_corpus)
+        print("Smooth context: ", smoothed_contexts)
+        prompt = get_prompt(question, smoothed_contexts, language)
         print("Bắt đầu promt:",prompt)
         print("Kết thúc promt")
         

@@ -31,7 +31,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
         >
             <Avatar
                 size={36}
-                src={!isUser ? "/MaoMao.jpg" : undefined}
+                src={!isUser ? "/capybara.jpg" : undefined}
                 icon={isUser ? <UserOutlined /> : undefined}
                 style={{
                     backgroundColor: isUser ? token.colorBgContainer : "transparent",

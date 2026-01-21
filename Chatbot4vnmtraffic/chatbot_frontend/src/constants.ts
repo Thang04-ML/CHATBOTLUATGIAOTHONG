@@ -1,1 +1,0 @@
-export const MESSAGE_TEXT_MAX_LENGTH = 500;

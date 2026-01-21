@@ -169,14 +169,16 @@ Frontend sẽ chạy tại: `http://localhost:3000`
 
 ## Đánh Giá Hiệu Suất
 
-### Kết quả đánh giá các mô hình Embedding
+### Kết quả đánh giá các phương pháp truy xuất
 
-| Model | Giai đoạn | Hit-Rate @10 | MRR @10 | MAP @10 |
-|-------|-----------|--------------|---------|---------|
-| Halong_embedding | Trước finetune | 0.9110 | 0.8497 | 0.6721 |
-| Halong_embedding | Sau finetune | 0.9349 | 0.8386 | 0.6862 |
-| Vietnamese PhoBERT | Trước finetune | 0.9110 | 0.8209 | 0.6358 |
-| Vietnamese PhoBERT | Sau finetune | 0.9212 | 0.8121 | 0.6540 |
+| Model | Metric | Hit-Rate @10 | MRR @10 | MAP @10 |
+|-------|--------|--------------|---------|---------|
+| **Halong_embedding** | BM25 | 0.7838 | 0.8021 | 0.5129 |
+| | Semantic score | 0.7529 | 0.6592 | 0.5997 |
+| | Hybrid | 0.9649 | 0.8439 | 0.7904 |
+| **VietNamese phobert base** | BM25 | 0.7110 | 0.7246 | 0.4029 |
+| | Semantic score | 0.6512 | 0.6451 | 0.5397 |
+| | Hybrid | 0.9321 | 0.8627 | 0.7525 |
 
 ---
 

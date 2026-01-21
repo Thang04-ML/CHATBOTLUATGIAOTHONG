@@ -24,33 +24,29 @@ def merge_contexts(passages):
         psgs = passages_sorted_by_id[b:b+len(ids)]
         def get_clean_text(p):
             t = p.get("passage") or p.get("context") or ""
-            title_prefix = f"Title: {p['title']}\n\n"
+            title = p.get('title') or p.get('doc_id') or "Văn bản pháp luật"
+            title_prefix = f"Title: {title}\n\n"
             if t.startswith(title_prefix):
                 return t[len(title_prefix):].strip()
             return t.strip()
 
         psg_texts = [get_clean_text(x) for x in psgs]
-        merged = f"Title: {psgs[0]['title']}\n\n" + " ".join(psg_texts)
+        title = psgs[0].get('title') or psgs[0].get('doc_id') or "Văn bản pháp luật"
+        merged = f"Title: {title}\n\n" + " ".join(psg_texts)
         b = b + len(ids)
         merged_contexts.append(dict(
-            title=psgs[0]['title'], 
+            title=title, 
             passage=merged,
             score=max([x["combined_score"] for x in psgs]),
             merged_from_ids=ids
         ))
     return merged_contexts
 
-def discard_contexts(passages):
-    sorted_passages = sorted(passages, key=lambda x: x["score"], reverse=False)
-    if len(sorted_passages) == 1:
-        return sorted_passages
-    else:
-        shortened = deepcopy(sorted_passages)
-        for i in range(len(sorted_passages) - 1):
-            current, next = sorted_passages[i], sorted_passages[i+1]
-            if next["score"] - current["score"] >= 0.05:
-                shortened = sorted_passages[i+1:]
-        return shortened
+def discard_contexts(passages, **kwargs):
+    """
+    Giữ lại toàn bộ ngữ cảnh đã tìm được theo yêu cầu của người dùng.
+    """
+    return sorted(passages, key=lambda x: x["score"], reverse=True)
 
 def expand_context(passage, meta_corpus, word_window=60, n_sent=3):
     merged_from_ids = passage["merged_from_ids"]
@@ -117,5 +113,5 @@ def smooth_contexts(passages, meta_corpus):
     merged_contexts = merge_contexts(passages)
     shortlisted_contexts = discard_contexts(merged_contexts)
     expanded_contexts = expand_contexts(shortlisted_contexts, meta_corpus)
-    collapsed_contexts = collapse(expanded_contexts)
-    return collapsed_contexts
+    # Bỏ qua bước collapse để giữ lại toàn bộ các đoạn đã tìm được và đã gộp
+    return expanded_contexts

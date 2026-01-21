@@ -95,9 +95,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                     }}
                 >
                     {[
-                        "Trên cầu có được phép quay đầu xe không?",
-                        "Không đội mũ bảo hiểm bị phạt bao nhiêu?",
+                        "Dừng xe, đỗ xe là gì?",
                         "Mức phạt khi đi ngược chiều trên đường một chiều?",
+                        "Khi điều khiển xe vào đường cao tốc, người lái xe phải tuân thủ những quy tắc nào?",
                     ].map((suggestion, i) => (
                         <div
                             key={i}

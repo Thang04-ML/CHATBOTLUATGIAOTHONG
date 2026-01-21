@@ -96,7 +96,7 @@ Chatbot4vnmtraffic/
 
 ## Giao Diện Người Dùng
 
-![ChatBot UI Interface](image/Vietnamese_interface.png)
+![ChatBot UI Interface](image/Vietnamese_interface_new.png)
 
 ### Tính Năng Giao Diện
 - 📝 **Sidebar Navigation**: Quản lý các cuộc trò chuyện
